@@ -11,11 +11,13 @@ TABLE_NAME = 'heartbeats'
 # Load data from SQLite
 def load_data():
     conn = sqlite3.connect(DB_NAME)
-    query = f"SELECT timestamp, name, C, CO2cal, TVOC, [PM2.5], PM10, CO, AQI FROM {TABLE_NAME} ORDER BY timestamp"
+    query = f"SELECT timestamp, name, C, RH, [P-hPa], CO2cal, TVOC, [PM2.5], PM10, CO, AQI FROM {TABLE_NAME} ORDER BY timestamp"
     df = pd.read_sql_query(query, conn)
     conn.close()
     # Convert to float if possible
     df['C'] = pd.to_numeric(df['C'], errors='coerce')
+    df['RH'] = pd.to_numeric(df['RH'], errors='coerce')
+    df['P-hPa'] = pd.to_numeric(df['P-hPa'], errors='coerce')
     df['CO2cal'] = pd.to_numeric(df['CO2cal'], errors='coerce')
     df['TVOC'] = pd.to_numeric(df['TVOC'], errors='coerce')
     df['PM2.5'] = pd.to_numeric(df['PM2.5'], errors='coerce')
@@ -61,6 +63,12 @@ app.layout = html.Div([
         dcc.Tab(label='Temperature (C)', children=[
             dcc.Graph(id='temp-graph')
         ]),
+        dcc.Tab(label='Relative Humidity (%)', children=[
+            dcc.Graph(id='rh-graph')
+        ]),
+        dcc.Tab(label='P-hPa', children=[
+            dcc.Graph(id='phpa-graph')
+        ]),
         dcc.Tab(label='CO2cal', children=[
             dcc.Graph(id='co2cal-graph')
         ]),
@@ -85,6 +93,8 @@ app.layout = html.Div([
 @app.callback(
     [
         Output('temp-graph', 'figure'),
+        Output('rh-graph', 'figure'),
+        Output('phpa-graph', 'figure'),
         Output('co2cal-graph', 'figure'),
         Output('tvoc-graph', 'figure'),
         Output('pm25-graph', 'figure'),
@@ -110,6 +120,14 @@ def update_graphs(time_range, n_intervals):
         'data': make_traces(filtered, 'C'),
         'layout': go.Layout(title='Temperature (C) vs Time', xaxis={'title': 'Time'}, yaxis={'title': 'Temperature (C)'})
     }
+    rh_fig = {
+        'data': make_traces(filtered, 'RH'),
+        'layout': go.Layout(title='Relative Humidity (%) vs Time', xaxis={'title': 'Time'}, yaxis={'title': 'Relative Humidity (%)'})
+    }
+    phpa_fig = {
+        'data': make_traces(filtered, 'P-hPa'),
+        'layout': go.Layout(title='P-hPa vs Time', xaxis={'title': 'Time'}, yaxis={'title': 'P-hPa'})
+    }
     co2_fig = {
         'data': make_traces(filtered, 'CO2cal'),
         'layout': go.Layout(title='CO2cal vs Time', xaxis={'title': 'Time'}, yaxis={'title': 'CO2cal'})
@@ -134,7 +152,7 @@ def update_graphs(time_range, n_intervals):
         'data': make_traces(filtered, 'AQI'),
         'layout': go.Layout(title='AQI vs Time', xaxis={'title': 'Time'}, yaxis={'title': 'AQI'})
     }
-    return temp_fig, co2_fig, tvoc_fig, pm25_fig, pm10_fig, co_fig, aqi_fig
+    return temp_fig, rh_fig, phpa_fig, co2_fig, tvoc_fig, pm25_fig, pm10_fig, co_fig, aqi_fig
 
 if __name__ == '__main__':
     app.run(debug=False, host="0.0.0.0")
