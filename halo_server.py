@@ -16,6 +16,8 @@ SENSOR_FIELDS = [
     'HItvoc', 'HIno2'
 ]
 
+# Add site as a special field (not in SENSOR_FIELDS, but in DB and message)
+
 
 def load_approved_macs(filename='approved_macs.txt'):
     try:
@@ -38,6 +40,7 @@ def init_db():
             timestamp TEXT,
             mac TEXT,
             name TEXT,
+            site TEXT,
             {columns}
         )
     ''')
@@ -52,23 +55,27 @@ def parse_message(msg):
     mac = parts[0]
     name = parts[1]
     sensor_data = {}
+    site = None
     for item in parts[2:]:
         if '=' in item:
             key, value = item.split('=', 1)
-            sensor_data[key] = value
-    return mac, name, sensor_data
+            if key == 'site':
+                site = value
+            else:
+                sensor_data[key] = value
+    return mac, name, site, sensor_data
 
 # Save heartbeat to database
-def save_heartbeat(mac, name, sensor_data):
+def save_heartbeat(mac, name, site, sensor_data):
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
     timestamp = datetime.now().isoformat()
-    values = [timestamp, mac, name]
+    values = [timestamp, mac, name, site]
     for field in SENSOR_FIELDS:
         values.append(sensor_data.get(field, None))
-    placeholders = ', '.join(['?'] * (3 + len(SENSOR_FIELDS)))
+    placeholders = ', '.join(['?'] * (4 + len(SENSOR_FIELDS)))
     quoted_fields = ', '.join([f'"{field}"' for field in SENSOR_FIELDS])
-    c.execute(f"INSERT INTO {TABLE_NAME} (timestamp, mac, name, {quoted_fields}) VALUES ({placeholders})", values)
+    c.execute(f"INSERT INTO {TABLE_NAME} (timestamp, mac, name, site, {quoted_fields}) VALUES ({placeholders})", values)
     conn.commit()
     conn.close()
 
@@ -84,10 +91,10 @@ def handle_client(conn, addr):
             print(f"Received: {msg}")
             parsed = parse_message(msg)
             if parsed:
-                mac, name, sensor_data = parsed
+                mac, name, site, sensor_data = parsed
                 if mac in APPROVED_MACS:
-                    save_heartbeat(mac, name, sensor_data)
-                    print(f"Logged heartbeat from {mac} ({name})")
+                    save_heartbeat(mac, name, site, sensor_data)
+                    print(f"Logged heartbeat from {mac} ({name}) at site {site}")
                 else:
                     print(f"Rejected heartbeat from unapproved MAC: {mac}")
             else:
